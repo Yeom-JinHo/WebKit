@@ -525,6 +525,11 @@ void RenderImage::repaintOrMarkForLayout(ImageSizeChangeType imageSizeChange, co
     LayoutSize newIntrinsicSize = imageResource().intrinsicSize(style().usedZoom());
     LayoutSize oldIntrinsicSize = intrinsicSize();
 
+    // The image resource already describes the new image, so replacedContentRect() is the area that
+    // image paints into. The area the previous image painted into has to be rebuilt from the intrinsic
+    // size recorded for it, before updateIntrinsicSizeIfNeeded() overwrites that.
+    auto oldReplacedContentRect = replacedContentRect(NaturalDimensions::fixed(FloatSize { oldIntrinsicSize }));
+
     updateIntrinsicSizeIfNeeded(newIntrinsicSize);
 
     // In the case of generated image content using :before/:after/content, we might not be
@@ -548,6 +553,11 @@ void RenderImage::repaintOrMarkForLayout(ImageSizeChangeType imageSizeChange, co
                 repaintRect.intersect(enclosingIntRect(mapRect(changedRect, FloatRect { { }, concreteObjectSize.size() }, repaintRect)));
             }
         }
+        // When the image changed size, the area the previous image painted into may extend past the new
+        // one (object-fit: contain with a smaller image, say) and has to be repainted as well. This comes
+        // after the mapping above, which treats repaintRect as the area the new image paints into.
+        if (imageSourceHasChangedSize)
+            repaintRect.unite(oldReplacedContentRect);
         // FIXME: This needs to account for filter outsets: webkit.org/b/293553.
         repaintRectangle(repaintRect);
     }
